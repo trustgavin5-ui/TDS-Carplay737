@@ -16,23 +16,45 @@ jobs:
       with:
         xcode-version: latest
 
-    - name: Build App Archive
+    - name: Auto-Detect Workspace/Project and Build Archive
       run: |
-        xcodebuild -list
-        if [ -d "*.xcworkspace" ]; then
-          xcodebuild -workspace *.xcworkspace -scheme "TDS Car Kit" -sdk iphoneos -configuration Release archive -archivePath build/App.xcarchive CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
+        mkdir -p build
+        if ls *.xcworkspace 1> /dev/null 2>&1; then
+          WS=$(find . -maxdepth 2 -name "*.xcworkspace" | head -n 1)
+          SCHEME=$(xcodebuild -workspace "$WS" -list | awk '/Schemes:/{flag=1;next} /^$/{flag=0} flag' | xargs | awk '{print $1}')
+          echo "Building Workspace: $WS with Scheme: $SCHEME"
+          xcodebuild -workspace "$WS" \
+                     -scheme "$SCHEME" \
+                     -sdk iphoneos \
+                     -configuration Release \
+                     archive \
+                     -archivePath build/App.xcarchive \
+                     CODE_SIGN_IDENTITY="" \
+                     CODE_SIGNING_REQUIRED=NO \
+                     CODE_SIGNING_ALLOWED=NO
         else
-          xcodebuild -project *.xcodeproj -scheme "TDS Car Kit" -sdk iphoneos -configuration Release archive -archivePath build/App.xcarchive CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
+          PROJ=$(find . -maxdepth 2 -name "*.xcodeproj" | head -n 1)
+          SCHEME=$(xcodebuild -project "$PROJ" -list | awk '/Schemes:/{flag=1;next} /^$/{flag=0} flag' | xargs | awk '{print $1}')
+          echo "Building Project: $PROJ with Scheme: $SCHEME"
+          xcodebuild -project "$PROJ" \
+                     -scheme "$SCHEME" \
+                     -sdk iphoneos \
+                     -configuration Release \
+                     archive \
+                     -archivePath build/App.xcarchive \
+                     CODE_SIGN_IDENTITY="" \
+                     CODE_SIGNING_REQUIRED=NO \
+                     CODE_SIGNING_ALLOWED=NO
         fi
 
     - name: Export Unsigned IPA
       run: |
         mkdir -p build/Payload
         cp -R build/App.xcarchive/Products/Applications/*.app build/Payload/
-        cd build && zip -r TDS-CarKit-unsigned.ipa Payload
+        cd build && zip -r TDS-CarPlay-unsigned.ipa Payload
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: tds-car-kit-ipa
-        path: build/TDS-CarKit-unsigned.ipa
+        name: tds-carplay-ipa
+        path: build/TDS-CarPlay-unsigned.ipa
